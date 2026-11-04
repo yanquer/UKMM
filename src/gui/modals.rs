@@ -473,11 +473,11 @@ impl App {
         if let Some(ref last_version) = self.changelog {
             egui::Window::new("Changelog_New".localize())
                 .collapsible(false)
-                .scroll([false, true])
                 .anchor(Align2::CENTER_CENTER, Vec2::default())
                 .frame(Frame::window(&ctx.style()).inner_margin(20.0))
                 .default_width(600.0)
-                .default_height(500.0)
+                .max_width((ctx.screen_rect().width() - 64.0).max(160.0))
+                .default_height(420.0)
                 .show(ctx, |ui| {
                     ui.spacing_mut().item_spacing.y = 6.0;
                     let md_cache = ui.data_mut(|d| {
@@ -486,13 +486,22 @@ impl App {
                         )
                         .clone()
                     });
-                    egui_commonmark::CommonMarkViewer::new("changelog").show(
-                        ui,
-                        &mut md_cache.lock(),
-                        last_version,
-                    );
+                    let body_height = (ui.available_height() - 96.0)
+                        .min(ctx.screen_rect().height() - 220.0)
+                        .max(64.0);
+                    egui::ScrollArea::vertical()
+                        .id_source("changelog_body")
+                        .auto_shrink([false, true])
+                        .max_height(body_height)
+                        .show(ui, |ui| {
+                            egui_commonmark::CommonMarkViewer::new("changelog").show(
+                                ui,
+                                &mut md_cache.lock(),
+                                last_version,
+                            );
+                        });
                     ui.separator();
-                    ui.horizontal(|ui| {
+                    ui.horizontal_wrapped(|ui| {
                         if ui
                             .icon_text_button("Changelog_Subscribe".localize(), Icon::Patreon)
                             .on_hover_text("https://www.patreon.com/nicenenerd")
@@ -513,10 +522,8 @@ impl App {
                             ));
                         }
                     });
-                    let width = ui.min_size().x;
                     ui.horizontal(|ui| {
-                        ui.allocate_ui_with_layout(
-                            Vec2::new(width, ui.min_size().y),
+                        ui.with_layout(
                             Layout::right_to_left(Align::Center),
                             |ui| {
                                 if self.new_version.is_some() {

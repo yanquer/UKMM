@@ -144,7 +144,8 @@ impl Theme {
                                 fg_stroke: Stroke::new(1.0_f32, hex_color!("#D2D5D8")),
                                 rounding: Rounding::same(0.0),
                                 expansion: 0.0,
-                                weak_bg_fill: Color32::TRANSPARENT,
+                                // egui 将透明淡化底色视为不可见，禁用控件必须使用不透明底色。
+                                weak_bg_fill: hex_color!("#1C1E1F"),
                             },
                             inactive: WidgetVisuals {
                                 bg_fill: hex_color!("#292C2F"),
@@ -386,5 +387,35 @@ impl Theme {
                 });
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 禁用操作必须保留可见的文字和占位，不能在未编辑设置时消失。
+    #[test]
+    fn disabled_controls_remain_visible() {
+        let context = egui::Context::default();
+        let mut fonts = egui::FontDefinitions::default();
+        fonts.families.insert(
+            FontFamily::Name("Bold".into()),
+            fonts.families[&FontFamily::Proportional].clone(),
+        );
+        context.set_fonts(fonts);
+        Theme::Sheikah.set_theme(&context);
+        let output = context.run(egui::RawInput::default(), |context| {
+            egui::CentralPanel::default().show(context, |ui| {
+                ui.add_enabled_ui(false, |ui| {
+                    assert!(!ui.is_enabled());
+                    assert!(ui.is_visible());
+                    let _ = ui.button("Save");
+                });
+            });
+        });
+        assert!(output.shapes.iter().any(|shape| {
+            matches!(&shape.shape, egui::Shape::Text(text) if text.galley.text() == "Save")
+        }));
     }
 }

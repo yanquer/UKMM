@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Changed**
 
+- Aligned settings labels and controls on wide panels, with stacked fields on
+  narrow panels and a visible save/reset bar outside the settings scroll area.
+- Wrapped mod names and metadata in the details pane and localized categories.
+- Kept welcome/update dialog actions outside the scrolling content.
 - Refined neutral dark surfaces, dock spacing and default sidebar proportions;
   added visible dialog borders and more space around welcome content.
 - Split profile actions and filtering into wrapping toolbar rows; added clear-filter
@@ -30,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Fixed**
 
+- Kept disabled controls visible in the Sheikah theme, including settings actions.
 - Avoided a debug startup crash on macOS 26 caused by Objective-C signature checks
   in the legacy windowing dependency. Panic messages and backtraces are now flushed
   to the application log before a native callback aborts.

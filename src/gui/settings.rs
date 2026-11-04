@@ -24,23 +24,44 @@ use uk_util::OptionResultExt;
 
 use super::{App, Message};
 
+/// 宽面板对齐设置项名称与控件，窄面板改为上下排列并允许选项换行。
 fn render_setting<R>(
     name: &str,
     description: &str,
     ui: &mut Ui,
     add_contents: impl FnOnce(&mut Ui) -> R,
 ) -> InnerResponse<R> {
-    let _icon_height = ui.text_style_height(&TextStyle::Small);
-    ui.horizontal(|ui| {
-        ui.label(RichText::new(name).family(egui::FontFamily::Name("Bold".into())));
+    let label = |ui: &mut Ui| {
+        ui.label(RichText::new(name).family(egui::FontFamily::Name("Bold".into())))
+            .on_hover_text(description);
         ui.add(
             ImageButton::new(icons::get_icon(ui.ctx(), icons::Icon::Info))
                 .frame(false)
-                .tint(ui.visuals().text_color()),
+                .tint(ui.visuals().text_color().gamma_multiply(0.8)),
         )
         .on_hover_text(description);
-    });
-    ui.horizontal(|ui| add_contents(ui))
+    };
+    let controls = |ui: &mut Ui| {
+        ui.spacing_mut().text_edit_width = (ui.available_width() - 88.0).clamp(64.0, 400.0);
+        ui.horizontal_wrapped(add_contents).inner
+    };
+    if ui.available_width() >= 560.0 {
+        let label_width = (ui.available_width() * 0.3).clamp(160.0, 220.0);
+        ui.horizontal(|ui| {
+            ui.allocate_ui_with_layout(
+                egui::vec2(label_width, ui.spacing().interact_size.y),
+                Layout::left_to_right(Align::Center),
+                |ui| {
+                    ui.set_min_width(label_width);
+                    label(ui);
+                },
+            );
+            controls(ui)
+        })
+    } else {
+        ui.horizontal(label);
+        ui.scope(controls)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -483,10 +504,13 @@ impl App {
         egui::Frame::none().inner_margin(4.0).show(ui, |ui| {
             let mut wiiu_changed = false;
             let mut switch_changed = false;
-            let scroll_height = ui.available_height() - 37.0_f32;
+            let footer_height = ui.spacing().interact_size.y.max(
+                ui.text_style_height(&TextStyle::Body) + ui.spacing().button_padding.y * 2.0,
+            ) + ui.spacing().item_spacing.y * 3.0 + 12.0;
+            let scroll_height = (ui.available_height() - footer_height).max(0.0);
             egui::ScrollArea::vertical().auto_shrink(
                 [false, false]
-            ).max_height(scroll_height).show(ui, |ui| {
+            ).id_source("settings_content").max_height(scroll_height).show(ui, |ui| {
                 ui.vertical(|ui| {
                     let settings = &mut self.temp_settings;
                     let mut theme_change: Option<Theme> = None;
@@ -672,7 +696,8 @@ impl App {
                     }
                 };
             });
-            ui.add_space(8.0);
+            ui.separator();
+            ui.add_space(4.0);
             ui.horizontal(|ui| {
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     let platform_config_changed =
@@ -720,12 +745,10 @@ impl App {
                         }
                     });
                     if platform_config_changed {
-                        ui.label(
-                            RichText::new("Changes to settings have not been saved")
-                                .color(uk_ui::visuals::RED)
-                                .heading()
-                                .size(13.0_f32),
-                        );
+                        ui.add(egui::Label::new(
+                            RichText::new("Settings_Unsaved".localize())
+                                .color(ui.visuals().warn_fg_color),
+                        ).truncate()).on_hover_text("Settings_Unsaved".localize());
                     }
                 });
             });

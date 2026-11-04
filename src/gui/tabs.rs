@@ -44,6 +44,15 @@ impl TabViewer for super::App {
         true
     }
 
+    /// 设置页自行分配滚动区域以固定操作栏，详情页仅允许纵向滚动。
+    fn scroll_bars(&self, tab: &Self::Tab) -> [bool; 2] {
+        match tab {
+            Tabs::Settings => [false, false],
+            Tabs::Info => [false, true],
+            _ => [true, true],
+        }
+    }
+
     fn ui(&mut self, ui: &mut Ui, tab: &mut Self::Tab) {
         ui.add_enabled_ui(!self.modal_open(), |ui| {
             match tab {

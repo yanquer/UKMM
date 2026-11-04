@@ -68,32 +68,33 @@ impl Component for ModInfo<'_> {
     fn show(&self, ui: &mut Ui) -> egui::InnerResponse<Option<Self::Message>> {
         let mut msg = None;
         let mod_ = self.0;
-        egui::Frame::none().inner_margin(2.0).show(ui, |ui| {
+        egui::Frame::none().inner_margin(8.0).show(ui, |ui| {
             ui.spacing_mut().item_spacing.y = 8.;
             ui.add_space(8.);
             if let Some(preview) = self.preview() {
-                let available = ui.available_size();
-                preview.show_max_size(ui, [available.x.max(0.0), available.y.max(0.0)].into());
+                preview.show_max_size(ui, [ui.available_width().max(0.0), 180.0].into());
                 ui.add_space(8.);
             }
+            ui.add(Label::new(RichText::new(mod_.meta.name.as_str()).size(18.0).family(egui::FontFamily::Name("Bold".into()))).wrap());
+            ui.add_space(4.0);
             let ver = mod_.meta.version.to_string();
+            let category = mod_.meta.category.to_loc_str().localize();
             [
-                ("Info_Name".localize(), mod_.meta.name.as_str()),
                 ("Info_Version".localize(), ver.as_str()),
-                ("Info_Category".localize(), mod_.meta.category.into()),
+                ("Info_Category".localize(), category.as_ref()),
                 ("Info_Author".localize(), mod_.meta.author.as_str()),
             ]
             .into_iter()
             .filter(|(_, v)| !v.is_empty())
             .for_each(|(label, value)| {
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new(label).family(egui::FontFamily::Name("Bold".into())));
-                    ui.add_space(8.);
-                    ui.with_layout(Layout::right_to_left(Align::Max), |ui| {
-                        ui.add(Label::new(value).wrap_mode(egui::TextWrapMode::Truncate));
-                    })
+                ui.horizontal_top(|ui| {
+                    let label_width = (ui.available_width() * 0.3).clamp(48.0, 80.0);
+                    ui.add_sized([label_width, 20.0], Label::new(RichText::new(label).family(egui::FontFamily::Name("Bold".into()))));
+                    ui.add(Label::new(value).wrap()).on_hover_text(value);
                 });
             });
+            ui.add_space(8.0);
+            ui.separator();
             ui.label(RichText::new("Info_Description".localize())
                 .family(egui::FontFamily::Name("Bold".into())));
             ui.add_space(4.);

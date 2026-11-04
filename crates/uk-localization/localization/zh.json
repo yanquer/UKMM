@@ -206,6 +206,7 @@
     "Settings_Storage_Desc": "UKMM将在此存储mod、配置文件和其他类似数据。",  
     "Settings_Sys7z": "使用系统7z",  
     "Settings_Sys7z_Desc": "默认情况下，UKMM将尝试使用来自系统PATH的7z来提取7-Zip文件（如BNP文件）。\n否则，它将回退到一个较慢的内建7z提取库。如果遇到7z相关错误，尝试禁用此选项。",  
+    "Settings_Unsaved": "设置尚未保存",
     "Settings_Theme": "主题",  
     "Settings_Theme_Desc": "用户界面主题",  
     "Tab_Deploy": "部署",  
