@@ -39,6 +39,13 @@ pub enum LocLang {
     Vietnamese,
 }
 
+impl Default for LocLang {
+    /// 根据系统语言选择界面默认语言，不支持或无法读取时使用英语。
+    fn default() -> Self {
+        Self::from_locale(sys_locale::get_locale().as_deref())
+    }
+}
+
 impl From<LocLang> for &str {
     fn from(value: LocLang) -> Self {
         match value {
@@ -65,6 +72,39 @@ impl std::fmt::Display for LocLang {
 }
 
 impl LocLang {
+    /// 将系统语言标识映射到现有翻译，兼容区域、脚本及 POSIX 后缀。
+    fn from_locale(locale: Option<&str>) -> Self {
+        let Some(locale) = locale else {
+            log::warn!("System UI language unavailable; falling back to English");
+            return Self::English;
+        };
+        let code = locale.split(['-', '_', '.', '@']).next().unwrap_or("");
+        let language = match code.to_ascii_lowercase().as_str() {
+            "en" => Self::English,
+            "nl" => Self::Dutch,
+            "fr" => Self::French,
+            "de" => Self::German,
+            "it" => Self::Italian,
+            "ja" => Self::Japanese,
+            "ko" => Self::Korean,
+            "ru" => Self::Russian,
+            // 当前中文翻译仅有简体，所有中文区域共用现有翻译。
+            "zh" => Self::SimpleChinese,
+            "es" => Self::Spanish,
+            "ar" => Self::Arabic,
+            "vi" => Self::Vietnamese,
+            _ => {
+                log::warn!(
+                    "Unsupported system UI language {:?}; falling back to English",
+                    locale.chars().take(64).collect::<String>()
+                );
+                return Self::English;
+            }
+        };
+        log::debug!("Detected system UI language: {language}");
+        language
+    }
+
     pub fn iter() -> std::slice::Iter<'static, Self> {
         [
             Self::English,
@@ -218,5 +258,82 @@ impl Localization {
                 .collect(),
         };
         self.language = *lang;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LocLang;
+
+    struct WarningLogger(std::sync::Mutex<Vec<String>>);
+
+    impl log::Log for WarningLogger {
+        /// 仅采集语言回退产生的警告，避免并行测试的调试日志干扰。
+        fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+            metadata.level() == log::Level::Warn
+        }
+
+        /// 在内存中保存本次测试的有限条警告，供断言检查原始原因。
+        fn log(&self, record: &log::Record<'_>) {
+            if self.enabled(record.metadata()) {
+                self.0.lock().unwrap().push(record.args().to_string());
+            }
+        }
+
+        /// 测试日志直接保存于内存，无需刷新外部输出。
+        fn flush(&self) {}
+    }
+
+    static WARNINGS: WarningLogger = WarningLogger(std::sync::Mutex::new(Vec::new()));
+
+    /// 验证全部现有翻译均可由系统语言及区域标识匹配。
+    #[test]
+    fn system_locales_match_supported_languages() {
+        let cases = [
+            ("en-US", LocLang::English),
+            ("nl_NL.UTF-8", LocLang::Dutch),
+            ("fr-CA", LocLang::French),
+            ("de_DE@euro", LocLang::German),
+            ("it-IT", LocLang::Italian),
+            ("ja-JP", LocLang::Japanese),
+            ("ko-KR", LocLang::Korean),
+            ("ru-RU", LocLang::Russian),
+            ("zh-Hans-CN", LocLang::SimpleChinese),
+            ("zh_TW.UTF-8", LocLang::SimpleChinese),
+            ("ZH-hant-HK", LocLang::SimpleChinese),
+            ("es-MX", LocLang::Spanish),
+            ("ar-SA", LocLang::Arabic),
+            ("vi-VN", LocLang::Vietnamese),
+            ("zh", LocLang::SimpleChinese),
+        ];
+        for (locale, expected) in cases {
+            assert_eq!(LocLang::from_locale(Some(locale)), expected, "{locale}");
+        }
+    }
+
+    /// 验证缺失、不支持及无效语言标识使用英语回退。
+    #[test]
+    fn unavailable_or_unsupported_locales_fall_back_to_english() {
+        log::set_logger(&WARNINGS).unwrap();
+        log::set_max_level(log::LevelFilter::Warn);
+        for locale in [
+            None,
+            Some(""),
+            Some("pt-BR"),
+            Some("C"),
+            Some("POSIX"),
+            Some("?"),
+        ] {
+            assert_eq!(LocLang::from_locale(locale), LocLang::English);
+        }
+        let warnings = WARNINGS.0.lock().unwrap();
+        assert_eq!(warnings.len(), 6);
+        assert!(warnings[0].contains("unavailable"));
+        assert!(warnings[2].contains("Unsupported system UI language \"pt-BR\""));
+        assert!(
+            warnings
+                .iter()
+                .all(|message| message.contains("falling back to English"))
+        );
     }
 }

@@ -253,7 +253,7 @@ impl Default for Settings {
             check_updates: UpdatePreference::Stable,
             show_changelog: true,
             last_version: None,
-            lang: LocLang::English,
+            lang: LocLang::default(),
         }
     }
 }
@@ -458,5 +458,33 @@ impl Settings {
     #[inline]
     pub fn projects_dir(&self) -> PathBuf {
         self.storage_dir.join("projects")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Settings;
+    use uk_localization::LocLang;
+
+    /// 验证新设置及缺少语言项的旧配置采用系统默认语言。
+    #[test]
+    fn missing_language_uses_system_default() {
+        let settings: Settings = serde_yaml::from_str("{}").unwrap();
+        assert_eq!(settings.lang, LocLang::default());
+        assert_eq!(Settings::default().lang, settings.lang);
+    }
+
+    /// 验证所有已保存语言保留原选择，且可正常序列化往返。
+    #[test]
+    fn saved_language_is_preserved() {
+        for language in LocLang::iter() {
+            let settings = Settings {
+                lang: *language,
+                ..Settings::default()
+            };
+            let yaml = serde_yaml::to_string(&settings).unwrap();
+            let loaded: Settings = serde_yaml::from_str(&yaml).unwrap();
+            assert_eq!(loaded.lang, *language);
+        }
     }
 }

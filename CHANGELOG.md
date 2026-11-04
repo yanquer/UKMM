@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Changed**
 
+- Default the interface language to the system language when no language has been
+  saved, with English as the fallback for unavailable or unsupported languages.
 - Expanded drag-and-drop BNP detection to include decompressed folders
 - Reworded "Open mod" to "Install mod" in the File dropdown for clarity
 - No longer strips DLC identifier when sourcing files from a game dump when

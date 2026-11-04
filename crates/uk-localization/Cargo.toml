@@ -6,6 +6,8 @@ version.workspace = true
 
 [dependencies]
 dashmap = { workspace = true, features = ["rayon"] }
+log = { workspace = true }
 parking_lot = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+sys-locale = "0.3.2"
