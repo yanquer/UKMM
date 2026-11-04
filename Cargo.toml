@@ -152,6 +152,11 @@ aarch64-apple-darwin = "macos-latest"
 x86_64-apple-darwin = "macos-latest"
 x86_64-unknown-linux-gnu = "ubuntu-26.04"
 
+# macOS 26 的 Swift 屏幕数组使用有符号返回值编码，触发旧 objc2 对 ABI 兼容类型的断言。
+# 仅关闭 winit 0.29 所用 objc2 的调试断言，保留应用及其他依赖的调试检查。
+[profile.dev.package."objc2:0.4.1"]
+debug-assertions = false
+
 # The profile that 'cargo dist' will build with
 [profile.dist]
 inherits = "release"

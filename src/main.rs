@@ -61,8 +61,12 @@ fn main() -> Result<()> {
                     }
                 }
                 gui::tasks::wait_ipc();
-                std::panic::set_hook(Box::new(|_| {
-                    println!("{}", std::backtrace::Backtrace::force_capture());
+                std::panic::set_hook(Box::new(|info| {
+                    // 原生回调中的 panic 可能直接终止进程，必须在此保留原因并写入日志。
+                    let backtrace = std::backtrace::Backtrace::force_capture();
+                    eprintln!("{info}\n{backtrace}");
+                    log::error!("{info}\n{backtrace}");
+                    log::logger().flush();
                 }));
                 if let Err(e) = std::panic::catch_unwind(gui::main) {
                     display_error(e);

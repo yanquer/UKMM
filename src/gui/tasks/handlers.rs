@@ -16,7 +16,7 @@ pub fn register_handlers() -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "linux")]
 fn linux_create_handler() -> Result<()> {
     let home_dir = dirs2::home_dir().context("Failed to find home directory")?;
     let schema_file = home_dir

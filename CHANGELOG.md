@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Fixed**
 
+- Avoided a debug startup crash on macOS 26 caused by Objective-C signature checks
+  in the legacy windowing dependency. Panic messages and backtraces are now flushed
+  to the application log before a native callback aborts.
+- Restricted the Linux URL handler implementation to Linux builds.
 - Updated ARM64 build flags, so the program will build on macOS higher than 14
   - Thanks @emiyl and @hstriepe
 - Fixes shift-selecting multiple mods when mods are filtered or not sorted by
