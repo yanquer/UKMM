@@ -250,6 +250,7 @@ impl App {
                 Message::SetFocus(pane) => {
                     self.focused = pane;
                 }
+                Message::FocusTab(tab) => self.focus_tab(tab),
                 Message::SetTheme(theme) => {
                     theme.set_theme(ctx);
                     self.theme = theme;

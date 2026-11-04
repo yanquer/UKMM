@@ -1,10 +1,8 @@
-use std::sync::LazyLock;
-
 use color_hex::color_from_hex;
 use egui::{
-    epaint::{Margin, RectShape, Shadow, Tessellator},
+    epaint::{Margin, Shadow},
     style::{Selection, Spacing, TextCursorStyle, WidgetVisuals, Widgets},
-    vec2, Color32, FontFamily, LayerId, Mesh, Rect, Rounding, Stroke, Style, Ui, Visuals,
+    vec2, Color32, FontFamily, LayerId, Rounding, Stroke, Style, Ui, Visuals,
 };
 use egui_aesthetix::Aesthetix;
 use serde::{Deserialize, Serialize};
@@ -29,6 +27,7 @@ pub fn error_bg(visuals: &Visuals) -> Color32 {
     color.into()
 }
 
+/// 根据当前主题统一停靠面板、标签及分隔线的视觉层级。
 pub fn style_dock(style: &egui::Style) -> egui_dock::Style {
     let mut dock_style = egui_dock::Style::from_egui(style);
     dock_style.tab.tab_body.rounding = Rounding {
@@ -36,11 +35,17 @@ pub fn style_dock(style: &egui::Style) -> egui_dock::Style {
         nw: 2.0,
         ..Default::default()
     };
-    dock_style.tab.focused.text_color = style.visuals.strong_text_color();
-    dock_style.tab.inactive.text_color = style.visuals.weak_text_color();
+    dock_style.tab.inactive.text_color = style.visuals.text_color().gamma_multiply(0.8);
     dock_style.tab.tab_body.stroke.color = style.visuals.widgets.noninteractive.bg_stroke.color;
+    dock_style.tab.tab_body.bg_fill = style.visuals.panel_fill;
     dock_style.tab.active.outline_color = style.visuals.widgets.noninteractive.bg_stroke.color;
-    dock_style.separator.width = 0.5;
+    dock_style.tab_bar.height = 34.0;
+    dock_style.tab_bar.bg_fill = style.visuals.extreme_bg_color;
+    dock_style.tab.minimum_width = Some(80.0);
+    dock_style.tab.focused.bg_fill = style.visuals.panel_fill;
+    dock_style.tab.focused.text_color = style.visuals.hyperlink_color;
+    dock_style.tab.tab_body.inner_margin = Margin::same(8.0);
+    dock_style.separator.width = 2.0;
     dock_style.separator.color_idle = style.visuals.widgets.noninteractive.bg_stroke.color;
     dock_style.separator.color_dragged = style.visuals.widgets.active.bg_stroke.color;
     dock_style.separator.color_hovered = style.visuals.widgets.active.bg_stroke.color;
@@ -48,51 +53,25 @@ pub fn style_dock(style: &egui::Style) -> egui_dock::Style {
     dock_style
 }
 
+/// 在可见区域绘制低对比度的 Sheikah 网格，避免背景干扰列表阅读。
 pub fn slate_grid(ui: &mut Ui) {
     ui.with_layer_id(LayerId::background(), |ui| {
-        let cursor = ui.cursor();
-        let width = ui.available_width();
-        let height = ui.available_height() * 1.5;
-        static GRID_COLOR: LazyLock<Color32> = LazyLock::new(|| BLUE.linear_multiply(0.0333));
-        const GRID_OFFSET: f32 = 16.0;
-        let bg_rect = Rect::from_min_size(ui.cursor().min, ui.available_size()); //.shrink(4.0);
-        ui.painter()
-            .rect_filled(bg_rect, Rounding::ZERO, ui.style().visuals.extreme_bg_color);
-        ui.set_clip_rect(bg_rect);
-        ui.painter().add({
-            let mut mesh = Mesh::default();
-            let mut tesselator = Tessellator::new(
-                ui.fonts(|f| f.pixels_per_point()),
-                egui::epaint::TessellationOptions {
-                    feathering: true,
-                    feathering_size_in_pixels: 32.0,
-                    ..Default::default()
-                },
-                [0, 0],
-                vec![],
-            );
-            tesselator.tessellate_rect(
-                &RectShape::stroke(
-                    bg_rect.expand2([64.0, 0.0].into()),
-                    0.0,
-                    Stroke::new(2.0_f32, ui.style().visuals.widgets.inactive.bg_fill),
-                ),
-                &mut mesh,
-            );
-            mesh
-        });
-        for i in 0..(height as usize / 48 + 1) {
-            ui.painter().hline(
-                cursor.min.x..=width + 4.0,
-                (i as f32 * 48.0) + cursor.min.y + GRID_OFFSET,
-                Stroke::new(1.0_f32, *GRID_COLOR),
+        let rect = ui.available_rect_before_wrap().intersect(ui.clip_rect());
+        let painter = ui.painter().with_clip_rect(rect);
+        painter.rect_filled(rect, Rounding::ZERO, ui.visuals().extreme_bg_color);
+        let stroke = Stroke::new(1.0, hex_color!("#191D20"));
+        for i in 0..(rect.height() / 48.0) as usize + 1 {
+            painter.hline(
+                rect.x_range(),
+                rect.top() + 16.0 + i as f32 * 48.0,
+                stroke,
             );
         }
-        for i in 0..(width as usize / 48 + 1) {
-            ui.painter().vline(
-                (i as f32 * 48.0) + cursor.min.x + GRID_OFFSET,
-                cursor.min.y..=height,
-                Stroke::new(1.0_f32, *GRID_COLOR),
+        for i in 0..(rect.width() / 48.0) as usize + 1 {
+            painter.vline(
+                rect.left() + 16.0 + i as f32 * 48.0,
+                rect.y_range(),
+                stroke,
             );
         }
     });
@@ -161,70 +140,70 @@ impl Theme {
                         widgets: Widgets {
                             noninteractive: WidgetVisuals {
                                 bg_fill: hex_color!("#1C1E1F"),
-                                bg_stroke: Stroke::new(1.0_f32, hex_color!("#2F2E2A")),
-                                fg_stroke: Stroke::new(1.0_f32, hex_color!("#BCCAD1")),
+                                bg_stroke: Stroke::new(1.0_f32, hex_color!("#393D40")),
+                                fg_stroke: Stroke::new(1.0_f32, hex_color!("#D2D5D8")),
                                 rounding: Rounding::same(0.0),
                                 expansion: 0.0,
                                 weak_bg_fill: Color32::TRANSPARENT,
                             },
                             inactive: WidgetVisuals {
-                                bg_fill: hex_color!("#1d4e77"),
-                                bg_stroke: Stroke::new(1.0_f32, hex_color!("#237ba3")),
+                                bg_fill: hex_color!("#292C2F"),
+                                bg_stroke: Stroke::new(1.0_f32, hex_color!("#484E52")),
                                 fg_stroke: Stroke::new(1.0_f32, hex_color!("#f0f0f0")),
-                                rounding: Rounding::same(2.0),
+                                rounding: Rounding::same(4.0),
                                 expansion: 0.0,
-                                weak_bg_fill: Color32::TRANSPARENT,
+                                weak_bg_fill: hex_color!("#292C2F"),
                             },
                             hovered: WidgetVisuals {
-                                bg_fill: hex_color!("#237ba3"),
-                                bg_stroke: Stroke::new(1.0_f32, hex_color!("#1d649a")),
+                                bg_fill: hex_color!("#484E52"),
+                                bg_stroke: Stroke::new(1.0_f32, hex_color!("#65C8F2")),
                                 fg_stroke: Stroke::new(1.5_f32, hex_color!("#f0f0f0")),
-                                rounding: Rounding::same(2.0),
+                                rounding: Rounding::same(4.0),
                                 expansion: 1.0,
-                                weak_bg_fill: Color32::TRANSPARENT,
+                                weak_bg_fill: hex_color!("#353A3E"),
                             },
                             active: WidgetVisuals {
-                                bg_fill: hex_color!("#12384f"),
-                                bg_stroke: Stroke::new(1.0_f32, hex_color!("#237ba3")),
+                                bg_fill: hex_color!("#1B4B65"),
+                                bg_stroke: Stroke::new(1.0_f32, hex_color!("#484E52")),
                                 fg_stroke: Stroke::new(1.5_f32, hex_color!("#D9EEFF")),
-                                rounding: Rounding::same(2.0),
+                                rounding: Rounding::same(4.0),
                                 expansion: 1.0,
-                                weak_bg_fill: Color32::TRANSPARENT,
+                                weak_bg_fill: hex_color!("#1B4B65"),
                             },
                             open: WidgetVisuals {
                                 bg_fill: hex_color!("#1C1E1F"),
-                                bg_stroke: Stroke::new(1.0_f32, hex_color!("#2F2E2A")),
+                                bg_stroke: Stroke::new(1.0_f32, hex_color!("#393D40")),
                                 fg_stroke: Stroke::new(1.0_f32, hex_color!("#D9EEFF")),
-                                rounding: Rounding::same(2.0),
+                                rounding: Rounding::same(4.0),
                                 expansion: 0.0,
                                 weak_bg_fill: Color32::TRANSPARENT,
                             },
                         },
                         selection: Selection {
-                            bg_fill: BLUE.linear_multiply(0.667),
+                            bg_fill: hex_color!("#205A78"),
                             stroke:  Stroke::new(1.0_f32, Color32::WHITE),
                         },
                         hyperlink_color: BLUE,
                         faint_bg_color: hex_color!("#252729"),
-                        extreme_bg_color: hex_color!("#030a0e"), // e.g. TextEdit background
+                        extreme_bg_color: hex_color!("#111314"), // e.g. TextEdit background
                         code_bg_color: Color32::from_gray(32),
                         warn_fg_color: ORANGE, // orange
                         error_fg_color: RED,    // red
                         window_rounding: Rounding::same(4.0),
                         window_shadow: Shadow {
-                            offset: egui::Vec2::new(0., 0.),
-                            blur:   5.,
-                            spread: 5.,
+                            offset: egui::Vec2::new(0., 6.),
+                            blur:   18.,
+                            spread: 0.,
                             color:  Color32::from_black_alpha(45),
                         },
                         popup_shadow: Shadow {
-                            offset: egui::Vec2::new(0., 0.),
-                            blur:   5.,
-                            spread: 5.,
+                            offset: egui::Vec2::new(0., 6.),
+                            blur:   18.,
+                            spread: 0.,
                             color:  Color32::from_black_alpha(45),
                         },
-                        window_fill: hex_color!("#1C1E1F"),
-                        window_stroke: Stroke::NONE,
+                        window_fill: hex_color!("#252728"),
+                        window_stroke: Stroke::new(1.0, hex_color!("#515456")),
                         panel_fill: hex_color!("#1C1E1F"),
                         resize_corner_size: 8.0,
                         text_cursor: TextCursorStyle {
@@ -239,9 +218,11 @@ impl Theme {
                         ..Default::default()
                     },
                     spacing: Spacing {
-                        button_padding: [4.0, 2.0].into(),
-                        icon_spacing: 4.0,
-                        menu_margin: Margin::same(4.0),
+                        item_spacing: vec2(8.0, 6.0),
+                        button_padding: vec2(10.0, 6.0),
+                        interact_size: vec2(40.0, 28.0),
+                        icon_spacing: 6.0,
+                        menu_margin: Margin::same(8.0),
                         indent_ends_with_horizontal_line: false,
                         ..Default::default()
                     },

@@ -339,14 +339,12 @@ impl App {
         }
     }
 
+    /// 分行展示配置操作与筛选统计，避免窄面板中控件互相挤占。
     pub fn render_profile_menu(&mut self, ui: &mut Ui) {
         egui::Frame::none()
-            .inner_margin(Margin {
-                left: 2.0,
-                ..Default::default()
-            })
+            .inner_margin(Margin::symmetric(4.0, 6.0))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     let current_profile = self
                         .core
                         .settings()
@@ -354,6 +352,7 @@ impl App {
                         .map(|c| c.profile.to_string())
                         .unwrap_or_else(|| "Default".to_owned());
                     ComboBox::from_id_source("profiles")
+                        .width(144.0_f32.min(ui.available_width()))
                         .selected_text(&current_profile)
                         .show_ui(ui, |ui| {
                             self.core.settings().profiles().for_each(|profile| {
@@ -377,7 +376,7 @@ impl App {
                         .clicked()
                     {
                         self.do_update(Message::NewProfile);
-                    };
+                    }
                     if ui
                         .icon_button(Icon::Menu)
                         .on_hover_text("Profile_Manage".localize())
@@ -385,31 +384,50 @@ impl App {
                     {
                         self.profiles_state.borrow_mut().show = true;
                     }
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.add_space(20.);
-                        ui.label(
-                            RichText::new(format!(
-                                "{} {} / {} {} / {} {}",
-                                self.mods.iter().filter(|m| m.enabled).count(),
-                                "Profile_ActiveMods_2".localize(),
-                                self.mods.len(),
-                                "Profile_ActiveMods_1".localize(),
-                                self.mods.iter()
-                                    .filter(|m| m.meta.name.to_lowercase()
-                                        .contains(&self.mod_list_filter.to_lowercase()))
-                                    .count(),
-                                "Profile_ActiveMods_3".localize(),
-                            ))
-                            .strong(),
-                        );
-                        ui.add_space(20.);
-                        ui.text_edit_singleline(&mut self.mod_list_filter);
-                        ui.label(RichText::new("Mod_Filter".localize()).strong());
-                    });
+                    if ui
+                        .icon_text_button("Menu_File_Open".localize(), Icon::Import)
+                        .clicked()
+                    {
+                        self.do_update(Message::SelectFile);
+                    }
+                });
+                ui.add_space(4.0);
+                ui.horizontal_wrapped(|ui| {
+                    let search_width = (ui.available_width() * 0.45).clamp(96.0, 260.0);
+                    ui.add_sized(
+                        [search_width, ui.spacing().interact_size.y],
+                        egui::TextEdit::singleline(&mut self.mod_list_filter)
+                            .hint_text("Mod_Filter".localize()),
+                    )
+                    .on_hover_text("Mod_Filter".localize());
+                    if !self.mod_list_filter.is_empty()
+                        && ui
+                            .icon_button(Icon::Cancel)
+                            .on_hover_text("Mod_Filter_Clear".localize())
+                            .clicked()
+                    {
+                        self.mod_list_filter.clear();
+                    }
+                    ui.label(
+                        RichText::new(format!(
+                            "{} {} / {} {}",
+                            self.mods.iter().filter(|m| m.enabled).count(),
+                            "Profile_ActiveMods_2".localize(),
+                            self.mods.len(),
+                            "Profile_ActiveMods_1".localize(),
+                        ))
+                        .color(ui.visuals().text_color()),
+                    );
+                    if !self.mod_list_filter.is_empty() {
+                        ui.label(format!(
+                            "· {} {}",
+                            self.filtered_mods(&self.mod_list_filter).len(),
+                            "Profile_ActiveMods_3".localize(),
+                        ));
+                    }
                 });
             });
     }
-
     pub fn render_pending(&self, ui: &mut Ui) {
         if !self.dirty().is_empty() {
             egui::Window::new("Pending_Changes".localize())
@@ -457,7 +475,7 @@ impl App {
                 .collapsible(false)
                 .scroll([false, true])
                 .anchor(Align2::CENTER_CENTER, Vec2::default())
-                .frame(Frame::window(&ctx.style()).inner_margin(6.))
+                .frame(Frame::window(&ctx.style()).inner_margin(20.0))
                 .default_width(600.0)
                 .default_height(500.0)
                 .show(ctx, |ui| {

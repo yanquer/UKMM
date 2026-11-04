@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Changed**
 
+- Refined neutral dark surfaces, dock spacing and default sidebar proportions;
+  added visible dialog borders and more space around welcome content.
+- Split profile actions and filtering into wrapping toolbar rows; added clear-filter
+  controls and actionable setup, empty-library and no-match states.
+- Improved mod table row spacing, column clipping and long-name tooltips.
 - Default the interface language to the system language when no language has been
   saved, with English as the fallback for unavailable or unsupported languages.
 - Expanded drag-and-drop BNP detection to include decompressed folders

@@ -1,11 +1,11 @@
-use std::{collections::HashMap, process::Command, sync::OnceLock};
+use std::{collections::HashMap, process::Command};
 use serde::{Deserialize, Serialize};
 use strfmt::Format;
 use uk_localization::string_ext::LocString;
 use uk_manager::mods::Mod;
 use uk_ui::{
     egui::{
-        self, epaint::Margin, text::LayoutJob, Align, Button, Color32, CursorIcon, Id, Key,
+        self, epaint::Margin, Align, Button, Color32, CursorIcon, Id, Key,
         LayerId, Layout, Response, Sense, TextStyle, Ui, Vec2,
     },
     egui_extras::{Column, TableBuilder, TableRow},
@@ -41,85 +41,25 @@ enum ContextMenuMessage {
 
 impl App {
     pub fn render_modlist(&mut self, ui: &mut Ui) {
-        static TEXT_HEIGHT: OnceLock<f32> = OnceLock::new();
-        let text_height = TEXT_HEIGHT.get_or_init(|| ui.text_style_height(&TextStyle::Body) + 4.);
-        static ICON_WIDTH: OnceLock<f32> = OnceLock::new();
-        let icon_width =
-            ICON_WIDTH.get_or_init(|| ui.spacing().icon_width + ui.spacing().button_padding.x);
-        static NUMERIC_COL_WIDTH: OnceLock<f32> = OnceLock::new();
-        let numeric_col_width = NUMERIC_COL_WIDTH.get_or_init(|| {
-            ui.fonts(|f| {
-                f.layout_job(LayoutJob::simple_singleline(
-                    "PriorityWW".to_owned(),
-                    ui.style()
-                        .text_styles
-                        .get(&TextStyle::Body)
-                        .unwrap()
-                        .clone(),
-                    ui.style().visuals.text_color(),
-                ))
-            })
-            .size()
-            .x
-        });
-        static CATEGORY_WIDTH: OnceLock<f32> = OnceLock::new();
-        
-        // Show helper message if no mods installed
-        if self.displayed_mods.is_empty() {
-            egui::Frame::none()
-                .inner_margin(Margin::same(40.0))
-                .show(ui, |ui| {
-                    ui.vertical_centered(|ui| {
-                        ui.add_space(80.0);
-                        
-                        let has_config = self.core.settings().platform_config().is_some();
-                        
-                        // Main message
-                        if !has_config {
-                            let message = "Helper_Modlist_NoConfig".localize();
-                            let vars = HashMap::from(
-                                [("platform".to_string(), self.core.settings().current_mode.to_string())]
-                            );
-                            let prompt = message.format(&vars).unwrap();
-                            
-                            ui.label(
-                                egui::RichText::new(prompt)
-                                    .size(16.0)
-                                    .color(ui.style().visuals.text_color())
-                            );
-                        } else {
-                            ui.label(
-                                egui::RichText::new("Helper_Modlist_NoMods".localize())
-                                    .size(16.0)
-                                    .color(ui.style().visuals.text_color())
-                            );
-                        }
-                        
-                        ui.add_space(8.0);
-                        
-                        // Hint text
-                        let hint = if !has_config {
-                            "Helper_Modlist_NoConfig_Hint".localize()
-                        } else {
-                            "Helper_Modlist_NoMods_Hint".localize()
-                        };
-                        
-                        ui.label(
-                            egui::RichText::new(hint)
-                                .size(13.0)
-                                .color(ui.style().visuals.weak_text_color())
-                        );
-                    });
-                });
+        let text_height = (ui.text_style_height(&TextStyle::Body) + 12.0)
+            .max(ui.spacing().interact_size.y);
+        let icon_width = ui.spacing().icon_width + ui.spacing().button_padding.x;
+        let numeric_col_width = 72.0;
+        let category_width = (ui.available_width() * 0.2).clamp(72.0, 144.0);
+        let filtered = self.filtered_mods(&self.mod_list_filter)
+            .iter().map(|(index, _)| *index).collect::<Vec<_>>();
+
+        if filtered.is_empty() {
+            self.render_modlist_empty(ui);
             return;
         }
-        
+
         egui::Frame::none()
             .inner_margin(Margin {
                 bottom: 4.0,
                 top:    4.0,
                 left:   4.0,
-                right:  -12.0,
+                right:  4.0,
             })
             .show(ui, |ui| {
                 ui.style_mut()
@@ -128,33 +68,23 @@ impl App {
                     .noninteractive
                     .fg_stroke
                     .color = ui.style().visuals.strong_text_color();
-                let max_width = ui.available_width();
+                // 显式按当前面板计算列宽，避免表头占满单元格后缓存旧宽度，阻止窗口缩窄。
+                let name_width = (ui.available_width()
+                    - icon_width
+                    - category_width
+                    - numeric_col_width * 2.0
+                    - ui.spacing().item_spacing.x * 4.0
+                    - ui.spacing().scroll.allocated_width())
+                    .max(40.0);
                 TableBuilder::new(ui)
+                    .striped(true)
                     .sense(Sense::click_and_drag())
                     .cell_layout(Layout::left_to_right(Align::Center))
-                    .column(Column::exact(*icon_width))
-                    .column(
-                        CATEGORY_WIDTH
-                            .get()
-                            .map(|w| {
-                                Column::exact(
-                                    max_width
-                                        - *icon_width
-                                        - (*numeric_col_width * 2.0)
-                                        - *w
-                                        - (8.0 * 5.0),
-                                )
-                            })
-                            .unwrap_or_else(Column::remainder),
-                    )
-                    .column(
-                        CATEGORY_WIDTH
-                            .get()
-                            .map(|w| Column::exact(*w))
-                            .unwrap_or_else(|| Column::initial(100.).at_least(16.).at_most(240.)),
-                    )
-                    .columns(Column::exact(*numeric_col_width), 2)
-                    .header(*text_height, |mut header| {
+                    .column(Column::exact(icon_width))
+                    .column(Column::exact(name_width))
+                    .column(Column::exact(category_width).clip(true))
+                    .columns(Column::exact(numeric_col_width).clip(true), 2)
+                    .header(text_height, |mut header| {
                         header.col(|ui| {
                             let is_current = self.list_state.sort == Sort::Enabled;
                             let label = if is_current {
@@ -185,7 +115,7 @@ impl App {
                         ]
                         .into_iter()
                         .for_each(|(label, sort)| {
-                            let width = header
+                            header
                                 .col(|ui| {
                                     let is_current = self.list_state.sort == sort;
                                     let mut label = label.into_owned();
@@ -220,20 +150,11 @@ impl App {
                                             ));
                                         }
                                     });
-                                })
-                                .0
-                                .width();
-                            if CATEGORY_WIDTH.get().is_none() && sort == Sort::Category {
-                                CATEGORY_WIDTH.set(width).unwrap();
-                            }
+                                });
                         });
                     })
                     .body(|body| {
-                        let filtered = self.filtered_mods(&self.mod_list_filter)
-                            .iter()
-                            .map(|(idx, _)| *idx)
-                            .collect::<Vec<_>>();
-                        body.rows(*text_height, filtered.len(), |row| {
+                        body.rows(text_height, filtered.len(), |row| {
                             let index = filtered[row.index()];
                             self.render_mod_row(index, row);
                         });
@@ -276,7 +197,7 @@ impl App {
                 }
             }
         }
-        self.render_drag_state(*text_height, *icon_width, *numeric_col_width, ui);
+        self.render_drag_state(text_height, icon_width, numeric_col_width, ui);
         if ui.input_mut(|i| i.pointer.any_released()) {
             ui.memory_mut(|m| m.data.insert_temp(Id::new("drag_delay_frames"), 0usize));
             if let Some((_start_index, dest_index)) = self
@@ -291,6 +212,65 @@ impl App {
         }
     }
 
+    /// 区分首次配置、空模组库和筛选无结果，并提供对应的下一步操作。
+    fn render_modlist_empty(&mut self, ui: &mut Ui) {
+        let has_mods = !self.displayed_mods.is_empty();
+        let has_config = self.core.settings().platform_config().is_some();
+        egui::Frame::none().inner_margin(24.0).show(ui, |ui| {
+            ui.add_space((ui.available_height() * 0.22).clamp(12.0, 80.0));
+            ui.vertical_centered(|ui| {
+                ui.set_max_width(440.0_f32.min(ui.available_width()));
+                ui.add(
+                    egui::Image::new(uk_ui::icons::get_icon(
+                        ui.ctx(),
+                        if has_mods {
+                            uk_ui::icons::Icon::List
+                        } else if has_config {
+                            uk_ui::icons::Icon::Import
+                        } else {
+                            uk_ui::icons::Icon::Settings
+                        },
+                    ))
+                    .fit_to_exact_size(Vec2::splat(36.0))
+                    .tint(ui.visuals().hyperlink_color),
+                );
+                ui.add_space(12.0);
+                let title = if has_mods {
+                    "Mod_Filter_Empty"
+                } else if has_config {
+                    "Mod_Empty_Title"
+                } else {
+                    "Mod_Setup_Title"
+                };
+                ui.label(egui::RichText::new(title.localize()).size(18.0).strong());
+                ui.add_space(8.0);
+                let body = if has_mods {
+                    "Mod_Filter_Empty_Hint".localize().into_owned()
+                } else if has_config {
+                    "Helper_Modlist_NoMods_Hint".localize().into_owned()
+                } else {
+                    let vars = HashMap::from([(
+                        "platform".to_string(),
+                        self.core.settings().current_mode.to_string(),
+                    )]);
+                    "Helper_Modlist_NoConfig".localize().format(&vars).unwrap()
+                };
+                ui.add(egui::Label::new(body).wrap());
+                ui.add_space(16.0);
+                if has_mods {
+                    if ui.button("Mod_Filter_Clear".localize()).clicked() {
+                        self.mod_list_filter.clear();
+                    }
+                } else if has_config {
+                    if ui.button("Menu_File_Open".localize()).clicked() {
+                        self.do_update(Message::SelectFile);
+                    }
+                } else if ui.button("Tab_Settings".localize()).clicked() {
+                    self.do_update(Message::FocusTab(super::Tabs::Settings));
+                }
+            });
+        });
+    }
     fn render_drag_state(
         &mut self,
         text_height: f32,
@@ -394,7 +374,8 @@ impl App {
             );
             process_col_res(
                 row.col(|ui| {
-                    ui.clipped_label(mod_.meta.name.as_str());
+                    ui.clipped_label(mod_.meta.name.as_str())
+                        .on_hover_text(mod_.meta.name.as_str());
                 })
                 .1,
             );

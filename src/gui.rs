@@ -170,6 +170,7 @@ pub enum Message {
     FilePickerBack,
     FilePickerSet(Option<PathBuf>),
     FilePickerUp,
+    FocusTab(Tabs),
     GetPackagingOptions,
     HandleMod(Mod),
     HandleSettings,
@@ -458,7 +459,9 @@ impl App {
         }
     }
 
+    /// 按名称筛选显示列表，保留排序后的索引供选择和拖拽使用。
     fn filtered_mods(&self, filter: &str) -> Vec<(usize, &Mod)> {
+        let filter = filter.to_lowercase();
         self.displayed_mods
             .iter()
             .enumerate()
@@ -466,7 +469,7 @@ impl App {
                 .meta
                 .name
                 .to_lowercase()
-                .contains(&filter.to_lowercase())
+                .contains(&filter)
             )
             .collect::<Vec<_>>()
     }

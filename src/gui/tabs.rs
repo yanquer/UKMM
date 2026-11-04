@@ -7,12 +7,13 @@ use uk_ui::{
 
 use super::{info, visuals, Component, Tabs};
 
+/// 创建兼顾模组列表、详情和日志可读性的默认停靠布局。
 pub fn default_ui() -> DockState<Tabs> {
     let mut state = DockState::new(vec![Tabs::Mods, Tabs::Package, Tabs::Settings]);
     let [main, side] = state.split(
         (0.into(), 0.into()),
         uk_ui::egui_dock::Split::Right,
-        0.85,
+        0.72,
         Node::leaf_with(vec![Tabs::Info, Tabs::Install]),
     );
     let [_side_top, _side_bottom] = state.split(
@@ -24,7 +25,7 @@ pub fn default_ui() -> DockState<Tabs> {
     let [main, _log] = state.split(
         (0.into(), main),
         uk_ui::egui_dock::Split::Below,
-        0.75,
+        0.78,
         Node::leaf(Tabs::Log),
     );
     state.set_focused_node_and_surface((0.into(), main));
@@ -99,5 +100,19 @@ impl TabViewer for super::App {
                 }
             }
         });
+    }
+}
+
+impl super::App {
+    /// 激活指定面板；面板关闭时重新打开，并同步关闭面板记录。
+    pub(super) fn focus_tab(&mut self, tab: Tabs) {
+        let mut tree = self.tree.borrow_mut();
+        if let Some(location) = tree.find_tab(&tab) {
+            tree.set_active_tab(location);
+            tree.set_focused_node_and_surface((location.0, location.1));
+        } else {
+            tree.push_to_focused_leaf(tab);
+        }
+        self.closed_tabs.remove(&tab);
     }
 }
